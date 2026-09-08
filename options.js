@@ -18,8 +18,9 @@ const $ = (id) => document.getElementById(id);
 // Supported hosts only — prevents prototype pollution and spurious overrides
 const ALLOWED_HOSTS = new Set([
   "danbooru.donmai.us", "rule34.xxx", "rule34.us", "rule34hentai.net",
-  "gelbooru.com", "safebooru.org", "e621.net", "e926.org",
-  "yande.re", "konachan.com", "konachan.net",
+  "gelbooru.com", "safebooru.org", "aibooru.online", "xbooru.com",
+  "hypnohub.net", "tbib.org", "e621.net", "e926.org",
+  "yande.re", "konachan.com", "konachan.net", "lolibooru.moe",
 ]);
 const LIMITS = { sdPrefix: 500, template: 2000, blacklist: 200 };
 

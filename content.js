@@ -5,10 +5,10 @@
 
   const host = location.hostname;
   const SITES = {
-    DANBOORU: /(^|\.)danbooru\.donmai\.us$/.test(host),
-    GELBOORU: /(^|\.)(rule34\.(xxx|us)|rule34hentai\.net|gelbooru\.com|safebooru\.org)$/.test(host),
+    DANBOORU: /(^|\.)(danbooru\.donmai\.us|aibooru\.online)$/.test(host),
+    GELBOORU: /(^|\.)(rule34\.(xxx|us)|rule34hentai\.net|gelbooru\.com|safebooru\.org|xbooru\.com|hypnohub\.net|tbib\.org)$/.test(host),
     E621: /(^|\.)(e621\.net|e926\.org)$/.test(host),
-    MOEBOORU: /(^|\.)(yande\.re|konachan\.(com|net))$/.test(host),
+    MOEBOORU: /(^|\.)(yande\.re|konachan\.(com|net)|lolibooru\.moe)$/.test(host),
   };
   const SUPPORTED = Object.values(SITES).some(Boolean);
   if (!SUPPORTED) return;
@@ -18,8 +18,9 @@
   const FORBIDDEN_KEYS = new Set(["__proto__", "prototype", "constructor"]);
   const ALLOWED_HOSTS = new Set([
     "danbooru.donmai.us", "rule34.xxx", "rule34.us", "rule34hentai.net",
-    "gelbooru.com", "safebooru.org", "e621.net", "e926.org",
-    "yande.re", "konachan.com", "konachan.net",
+    "gelbooru.com", "safebooru.org", "aibooru.online", "xbooru.com",
+    "hypnohub.net", "tbib.org", "e621.net", "e926.org",
+    "yande.re", "konachan.com", "konachan.net", "lolibooru.moe",
   ]);
   const LIMITS = { sdPrefix: 500, template: 2000, blacklist: 200, pattern: 100 };
 

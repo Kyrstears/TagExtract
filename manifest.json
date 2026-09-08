@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "TagExtract",
   "version": "1.0.0",
-  "description": "Copy tags, metadata and copyright from image boards (danbooru, rule34.xxx, e621, gelbooru, safebooru, yande.re, konachan) with one click.",
+  "description": "Copy tags, metadata and copyright from image boards (danbooru, rule34.xxx, e621, gelbooru, safebooru, yande.re, konachan and more) with one click.",
   "permissions": ["storage", "activeTab", "clipboardWrite"],
   "host_permissions": [
     "*://danbooru.donmai.us/*",
@@ -11,11 +11,16 @@
     "*://rule34hentai.net/*",
     "*://gelbooru.com/*",
     "*://safebooru.org/*",
+    "*://aibooru.online/*",
+    "*://xbooru.com/*",
+    "*://hypnohub.net/*",
+    "*://tbib.org/*",
     "*://e621.net/*",
     "*://e926.org/*",
     "*://yande.re/*",
     "*://konachan.com/*",
-    "*://konachan.net/*"
+    "*://konachan.net/*",
+    "*://lolibooru.moe/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -53,6 +58,14 @@
         "*://*.gelbooru.com/*",
         "*://safebooru.org/*",
         "*://*.safebooru.org/*",
+        "*://aibooru.online/*",
+        "*://*.aibooru.online/*",
+        "*://xbooru.com/*",
+        "*://*.xbooru.com/*",
+        "*://hypnohub.net/*",
+        "*://*.hypnohub.net/*",
+        "*://tbib.org/*",
+        "*://*.tbib.org/*",
         "*://e621.net/*",
         "*://*.e621.net/*",
         "*://e926.org/*",
@@ -62,7 +75,9 @@
         "*://konachan.com/*",
         "*://*.konachan.com/*",
         "*://konachan.net/*",
-        "*://*.konachan.net/*"
+        "*://*.konachan.net/*",
+        "*://lolibooru.moe/*",
+        "*://*.lolibooru.moe/*"
       ],
       "js": ["content.js"],
       "css": ["style.css"],

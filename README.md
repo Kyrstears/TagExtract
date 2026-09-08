@@ -11,12 +11,12 @@
 
 | Family | Hosts |
 |--------|-------|
-| Danbooru | `danbooru.donmai.us` |
-| Gelbooru | `gelbooru.com`, `safebooru.org`, `rule34.xxx`, `rule34.us`, `rule34hentai.net` |
+| Danbooru | `danbooru.donmai.us`, `aibooru.online` |
+| Gelbooru | `gelbooru.com`, `safebooru.org`, `rule34.xxx`, `rule34.us`, `rule34hentai.net`, `xbooru.com`, `hypnohub.net`, `tbib.org` |
 | e621 | `e621.net`, `e926.org` |
-| Moebooru | `yande.re`, `konachan.com`, `konachan.net` |
+| Moebooru | `yande.re`, `konachan.com`, `konachan.net`, `lolibooru.moe` |
 
-This extension matches 22 URL patterns, covering both http and https on www and apex domains.
+This extension matches 32 URL patterns, covering both http and https on www and apex domains.
 
 ## Features
 
