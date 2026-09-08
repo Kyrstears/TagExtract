@@ -1,0 +1,72 @@
+{
+  "manifest_version": 3,
+  "name": "TagExtract",
+  "version": "1.0.0",
+  "description": "Copy tags, metadata and copyright from image boards (danbooru, rule34.xxx, e621, gelbooru, safebooru, yande.re, konachan) with one click.",
+  "permissions": ["storage", "activeTab", "clipboardWrite"],
+  "host_permissions": [
+    "*://danbooru.donmai.us/*",
+    "*://rule34.xxx/*",
+    "*://rule34.us/*",
+    "*://rule34hentai.net/*",
+    "*://gelbooru.com/*",
+    "*://safebooru.org/*",
+    "*://e621.net/*",
+    "*://e926.org/*",
+    "*://yande.re/*",
+    "*://konachan.com/*",
+    "*://konachan.net/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "TagExtract"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "copy-tags": {
+      "suggested_key": { "default": "Ctrl+Shift+1" },
+      "description": "Copy tags"
+    },
+    "copy-all": {
+      "suggested_key": { "default": "Ctrl+Shift+2" },
+      "description": "Copy tags + metadata"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://danbooru.donmai.us/*",
+        "*://*.danbooru.donmai.us/*",
+        "*://rule34.xxx/*",
+        "*://*.rule34.xxx/*",
+        "*://rule34.us/*",
+        "*://*.rule34.us/*",
+        "*://rule34hentai.net/*",
+        "*://*.rule34hentai.net/*",
+        "*://gelbooru.com/*",
+        "*://*.gelbooru.com/*",
+        "*://safebooru.org/*",
+        "*://*.safebooru.org/*",
+        "*://e621.net/*",
+        "*://*.e621.net/*",
+        "*://e926.org/*",
+        "*://*.e926.org/*",
+        "*://yande.re/*",
+        "*://*.yande.re/*",
+        "*://konachan.com/*",
+        "*://*.konachan.com/*",
+        "*://konachan.net/*",
+        "*://*.konachan.net/*"
+      ],
+      "js": ["content.js"],
+      "css": ["style.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

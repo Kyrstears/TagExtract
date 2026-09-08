@@ -1,0 +1,56 @@
+:root { --te-accent:#3470b0; --te-accent-hover:#4a8fd4; --te-success:#2e7d32; --te-radius:6px; --te-radius-lg:8px; --te-shadow:0 2px 8px rgba(0,0,0,.35); }
+@media (prefers-reduced-motion: reduce) { .te-btn, .te-check, #te-merge-bar { transition:none !important; animation:none !important; } }
+
+/* ============================== Buttons ============================== */
+#te-buttons.te-embedded {
+  display: flex; flex-direction: column; gap: 6px;
+  width: 100%; margin: 10px 0 14px;
+  font-family: system-ui, sans-serif; box-sizing: border-box;
+}
+#te-buttons:not(.te-embedded) {
+  position: fixed; right: 12px; bottom: 12px; z-index: 999999;
+  display: flex; flex-direction: column; gap: 6px;
+  font-family: system-ui, sans-serif;
+}
+.te-btn {
+  background: var(--te-accent); color: #fff; border: none; border-radius: var(--te-radius);
+  padding: 7px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
+  box-shadow: var(--te-shadow); min-width: 118px; box-sizing: border-box;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+}
+.te-btn:hover { background: var(--te-accent-hover); }
+.te-btn:active { transform: translateY(1px); }
+.te-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; box-shadow: 0 0 0 3px var(--te-accent); }
+.te-btn-all { background: var(--te-success); }
+.te-btn-all:hover { background: #388e3c; }
+.te-btn.te-flash { background: #f57c00 !important; }
+.te-count {
+  background: rgba(0,0,0,.22); border-radius: 10px; padding: 1px 7px;
+  font-size: 11px; font-weight: 700; line-height: 1.4;
+}
+.te-label { flex: 0 1 auto; }
+
+/* Dark theme — luminance-based, applied via data-te-theme */
+#te-buttons[data-te-theme="dark"] .te-btn { box-shadow: 0 2px 10px rgba(0,0,0,.6); }
+#te-buttons[data-te-theme="dark"] .te-btn:not(.te-btn-all) { background: #3470b0; }
+#te-buttons[data-te-theme="dark"] .te-btn:not(.te-btn-all):hover { background: #4a8fd4; }
+#te-buttons[data-te-theme="dark"] .te-btn-all { background: #2e7d32; }
+#te-buttons[data-te-theme="dark"] .te-btn-all:hover { background: #388e3c; }
+
+/* ============================== Listing / merge bar ============================== */
+.te-check {
+  position: absolute; top: 6px; left: 6px; z-index: 5;
+  width: 20px; height: 20px; cursor: pointer;
+  accent-color: var(--te-accent); margin: 0;
+}
+.te-check:focus-visible { outline:2px solid var(--te-accent); outline-offset:2px; }
+#te-merge-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 14px; margin: 10px 0 12px;
+  background: #eef4ff; border: 1px solid #b9d1f5; border-radius: var(--te-radius-lg);
+  font-family: system-ui, sans-serif; font-size: 13px; color: #244;
+  box-sizing: border-box; width: 100%;
+}
+#te-merge-bar[data-te-theme="dark"] { background: #1e2a3a; border-color: #3a5a7a; color: #cde; }
+.te-merge-label { font-weight: 600; }
+.te-btn-merge { min-width: 0; padding: 6px 14px; font-size: 12px; flex-shrink: 0; }

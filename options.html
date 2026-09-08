@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>TagExtract Options</title>
+  <style>
+    :root { --accent:#3a7bc0; --accent-hover:#4a8fd4; --border:#bbb; --hint:#666; --bg:#fff; --fg:#222; --surface:#fafafa; --code-bg:#eee; --kbd-bg:#fff; --status:#2e7d32; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; max-width: 620px; margin: 24px auto; padding: 0 16px; color: var(--fg); background: var(--bg); line-height: 1.4; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    .subtitle { color: var(--hint); font-size: 12px; margin-bottom: 18px; }
+    h2 { font-size: 14px; margin: 22px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #e0e0e0; text-transform: uppercase; letter-spacing: .04em; color: #555; }
+    label { display: block; font-weight: 600; font-size: 13px; margin: 10px 0 4px; }
+    .row { display: flex; gap: 10px; }
+    .row > * { flex: 1; }
+    select, input[type="text"], input[type="number"], textarea {
+      width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--bg); color: var(--fg);
+    }
+    textarea { font-family: Consolas, monospace; min-height: 90px; resize: vertical; }
+    textarea.tall { min-height: 110px; }
+    .hint { font-size: 11px; color: var(--hint); margin-top: 3px; }
+    .inline { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+    .inline input[type="checkbox"] { width: auto; }
+    .inline label { margin: 0; font-weight: 500; }
+    .weights { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+    .weights label { margin-top: 0; font-size: 12px; }
+    .weights input { margin-top: 2px; }
+    .warn { color: #ef5350; font-size: 11px; display: none; }
+    .hidden { display: none !important; }
+    .btn { padding: 8px 18px; border: none; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-ghost { background: #eee; color: #333; }
+    .btn-ghost:hover { background: #e0e0e0; }
+    .btn-danger { background: #ef5350; color: #fff; font-size: 11px; padding: 3px 8px; border-radius: 4px; border: none; cursor: pointer; }
+    .btn:focus-visible, .btn-danger:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    select:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .actions { display: flex; gap: 10px; align-items: center; margin-top: 18px; }
+    #status { color: var(--status); font-size: 13px; min-height: 18px; }
+    /* overrides list */
+    .override-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid #e0e0e0; border-radius: 6px; margin-top: 6px; font-size: 12px; background: var(--surface); }
+    .override-item code { background: var(--code-bg); padding: 1px 5px; border-radius: 3px; }
+    .shortcut-hint { background: #f5f5f5; border-radius: 6px; padding: 8px 10px; font-size: 11px; color: #666; margin-top: 8px; }
+    .shortcut-hint kbd { background: var(--kbd-bg); border: 1px solid #ccc; border-bottom-width: 2px; padding: 1px 5px; border-radius: 3px; font-family: inherit; font-size: 11px; }
+    @media (prefers-color-scheme: dark) {
+      :root { --border:#444; --hint:#aaa; --bg:#1e1e1e; --fg:#e8e8e8; --surface:#2a2a2a; --code-bg:#333; --kbd-bg:#2a2a2a; --status:#7fd17f; }
+      h2 { border-bottom-color: #444; color: #bbb; }
+      .btn-ghost { background: #333; color: #ddd; }
+      .btn-ghost:hover { background: #3d3d3d; }
+      .shortcut-hint { background: #2a2a2a; color: #aaa; }
+      .shortcut-hint kbd { border-color: #555; }
+      .override-item { border-color: #444; }
+    }
+    @media (prefers-reduced-motion: reduce) { * { transition:none !important; animation:none !important; } }
+  </style>
+</head>
+<body>
+  <h1>TagExtract Options</h1>
+  <div class="subtitle">SD prompt weights, tag blacklist, and per-site overrides</div>
+
+  <h2>Copy format</h2>
+  <label for="format">Format</label>
+  <select id="format">
+    <option value="space">Spaces</option>
+    <option value="comma">Commas</option>
+    <option value="sd">SD / ComfyUI prompt (with prefix + weights)</option>
+    <option value="json">JSON</option>
+    <option value="custom">Custom template</option>
+  </select>
+  <div class="hint">SD prompt emits <code>(tag:1.10)</code> numeric weights. Works in both A1111 and ComfyUI. Parens in tags are auto-escaped.</div>
+
+  <div id="sd-section">
+    <div class="row">
+      <div>
+        <label for="prefix-preset">Quality prefix</label>
+        <select id="prefix-preset">
+          <option value="none">None</option>
+          <option value="sd15">SD 1.5 (masterpiece, best quality)</option>
+          <option value="pony">Pony V6 (score_9, score_8_up, score_7_up)</option>
+          <option value="illustrious">Illustrious (masterpiece, best quality, newest, absurdres, highres)</option>
+          <option value="anima">Anima (masterpiece, best quality, score_7, safe; lowercase, spaces)</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+      <div id="sd-custom-wrap" class="hidden">
+        <label for="sd-prefix">Custom prefix</label>
+        <input type="text" id="sd-prefix" placeholder="masterpiece, best quality" maxlength="500" />
+      </div>
+    </div>
+
+    <label class="inline" id="anima-artist-wrap"><input type="checkbox" id="anima-artist" /> Prefix artist tags with <code>@</code> (Anima artist convention)</label>
+    <div class="hint" id="anima-hint" style="margin-top:-4px">Anima expects <code>@artist name</code>. When enabled, each artist tag becomes e.g. <code>@hoshino aquamarine</code>. Anima tags are always lowercased and space-separated.</div>
+
+    <label>Per-category weights <span class="hint" style="font-weight:400">(1.0 = off, clamped 0.1 to 2.0; Character warns above 1.5; Anima models typically need higher weights than SDXL, e.g. <code>(chibi:2)</code>)</span></label>
+    <div class="weights">
+      <div><label for="w-character">Character</label><input type="number" id="w-character" min="0.1" max="2.0" step="0.05" /><div class="warn" id="warn-character">High weight may cause artifacts</div></div>
+      <div><label for="w-copyright">Copyright</label><input type="number" id="w-copyright" min="0.1" max="2.0" step="0.05" /></div>
+      <div><label for="w-artist">Artist</label><input type="number" id="w-artist" min="0.1" max="2.0" step="0.05" /></div>
+      <div><label for="w-general">General / meta</label><input type="number" id="w-general" min="0.1" max="2.0" step="0.05" /></div>
+    </div>
+  </div>
+
+  <div id="custom-row" class="hidden">
+    <label for="template">Custom template</label>
+    <textarea id="template" spellcheck="false" maxlength="2000"></textarea>
+    <div class="hint">Placeholders: {tags} (all tags), {copyright}, {artist}, {character}, {meta}</div>
+  </div>
+
+  <h2>Tag processing</h2>
+  <div class="row">
+    <div>
+      <label for="tag-style">Tag style</label>
+      <select id="tag-style">
+        <option value="spaces">Spaces (long hair)</option>
+        <option value="underscores">Underscores (long_hair)</option>
+      </select>
+    </div>
+    <div style="display:flex; align-items:flex-end; padding-bottom: 2px;">
+      <label class="inline" style="margin:0"><input type="checkbox" id="strip-qualifiers" /> Strip character qualifiers <span class="hint" style="margin:0">rem (re:zero) → rem</span></label>
+    </div>
+  </div>
+
+  <label for="blacklist">Blacklist: one pattern per line, <code>*</code> glob supported</label>
+  <textarea id="blacklist" class="tall" spellcheck="false" placeholder="commentary&#10;translated&#10;*(cosplay)"></textarea>
+  <div class="hint">Case-insensitive. Examples: <code>commentary</code>, <code>bad *</code>, <code>*(cosplay)</code>. Patterns match the tag as shown on that site (Danbooru and e621 use spaces).</div>
+
+  <h2>Behavior</h2>
+  <label class="inline"><input type="checkbox" id="auto-copy" /> Auto-copy tags when a post page loads</label>
+  <div class="hint" style="margin-top:-4px">Fires once per post. Auto-copies are not added to copy history.</div>
+  <label class="inline"><input type="checkbox" id="append-source" /> Append source URL to every copy</label>
+
+  <h2>Per-site overrides</h2>
+  <div class="hint">Override global format, prefix, and tag style for a specific site.</div>
+  <div class="row" style="margin-top:8px">
+    <select id="ov-host" aria-label="Site to override">
+      <option value="">Select site</option>
+      <option value="danbooru.donmai.us">danbooru.donmai.us</option>
+      <option value="rule34.xxx">rule34.xxx</option>
+      <option value="rule34.us">rule34.us</option>
+      <option value="rule34hentai.net">rule34hentai.net</option>
+      <option value="gelbooru.com">gelbooru.com</option>
+      <option value="safebooru.org">safebooru.org</option>
+      <option value="e621.net">e621.net</option>
+      <option value="e926.org">e926.org</option>
+      <option value="yande.re">yande.re</option>
+      <option value="konachan.com">konachan.com</option>
+      <option value="konachan.net">konachan.net</option>
+    </select>
+    <select id="ov-format" aria-label="Override format">
+      <option value="">(global format)</option>
+      <option value="space">Spaces</option>
+      <option value="comma">Commas</option>
+      <option value="sd">SD prompt</option>
+      <option value="json">JSON</option>
+      <option value="custom">Custom</option>
+    </select>
+    <select id="ov-preset" aria-label="Override prefix preset">
+      <option value="">(global prefix)</option>
+      <option value="none">None</option>
+      <option value="sd15">SD 1.5</option>
+      <option value="pony">Pony</option>
+      <option value="illustrious">Illustrious</option>
+      <option value="anima">Anima</option>
+      <option value="custom">Custom</option>
+    </select>
+    <select id="ov-tagstyle" aria-label="Override tag style">
+      <option value="">(global style)</option>
+      <option value="spaces">Spaces</option>
+      <option value="underscores">Underscores</option>
+    </select>
+    <button id="ov-add" class="btn btn-primary" style="flex:0 0 auto; padding: 6px 14px;">Add</button>
+  </div>
+  <div id="ov-list"></div>
+
+  <h2>Shortcuts</h2>
+  <div class="shortcut-hint">
+    <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>1</kbd> (Copy Tags) &nbsp; · &nbsp; <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>2</kbd> (Copy All)<br>
+    Remap at <code>chrome://extensions/shortcuts</code>.
+  </div>
+
+  <div class="actions">
+    <button id="save" class="btn btn-primary">Save</button>
+    <button id="reset" class="btn btn-ghost">Reset to defaults</button>
+    <span id="status" role="status" aria-live="polite"></span>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
