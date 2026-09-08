@@ -3,3 +3,6 @@ Thumbs.db
 *.log
 
 TagExtract-*.zip
+
+# Local notes — never publish to GitHub
+TODO.md

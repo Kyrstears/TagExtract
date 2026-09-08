@@ -2,7 +2,7 @@
 
 > Copy tags, metadata, and copyright from supported image boards in one click. Output is ready for your prompt.
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue)](#)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue)](#)
 [![Manifest](https://img.shields.io/badge/manifest-V3-green)](#)
 [![Browser](https://img.shields.io/badge/browser-Chrome%20%7C%20Chromium-orange)](#)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](#)
