@@ -3,7 +3,7 @@
 > Copy tags, metadata, and copyright from supported image boards in one click. Output is ready for your prompt.
 
 [![Release](https://img.shields.io/github/v/release/Kyrstears/TagExtract)](https://github.com/Kyrstears/TagExtract/releases)
-[![License](https://img.shields.io/github/license/Kyrstears/TagExtract)](LICENSE)
+[![License](https://img.shields.io/github/license/Kyrstears/TagExtract?cacheSeconds=3600)](LICENSE)
 [![Manifest](https://img.shields.io/badge/manifest-V3-green)](#)
 [![Browser](https://img.shields.io/badge/browser-Chrome%20%7C%20Chromium-orange)](#)
 [![Dependencies](https://img.shields.io/badge/dependencies-none-success)](#)
