@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-09-08
+
+### Added
+
+- MIT `LICENSE` file, so the license badge and topics are backed by an actual license grant.
+
+### Changed
+
+- README badges now use dynamic shields: release version follows GitHub releases, license reads the repo license. Added dependencies (none) and supported sites (16) badges.
+
 ## [1.1.0] - 2026-09-08
 
 ### Added
