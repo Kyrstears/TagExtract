@@ -1,5 +1,9 @@
-/* Shared constants — single source of truth in shared.js (loaded first) */
-const { DEFAULTS, ALLOWED_HOSTS, LIMITS, clampWeight } = TAGEXT;
+/* Shared constants — single source of truth in shared.js (loaded first).
+   Note: isValidTagOrder reads `this.TAG_CATEGORIES`, so it must be called
+   as TAGEXT.isValidTagOrder(...) — destructuring would break its context. */
+const { DEFAULTS, ALLOWED_HOSTS, LIMITS, clampWeight, TAG_CATEGORIES, VALID_RATING_MODES } = TAGEXT;
+
+const RATINGS = ["safe", "sensitive", "questionable", "explicit"];
 
 const $ = (id) => document.getElementById(id);
 
@@ -22,6 +26,13 @@ function load() {
     $("auto-copy").checked = !!s.autoCopy;
     $("append-source").checked = !!s.appendSource;
     $("anima-artist").checked = !!s.prefixArtistsWithAt;
+    renderTagOrder(s.tagOrder);
+    renderRules(Array.isArray(s.replacements) ? s.replacements : []);
+    if (!s.ratingFilter || typeof s.ratingFilter !== "object") s.ratingFilter = { ...DEFAULTS.ratingFilter };
+    $("rf-enabled").checked = !!s.ratingFilter.enabled;
+    $("rf-mode").value = VALID_RATING_MODES.has(s.ratingFilter.mode) ? s.ratingFilter.mode : DEFAULTS.ratingFilter.mode;
+    const allowed = new Set(Array.isArray(s.ratingFilter.allowed) && s.ratingFilter.allowed.length ? s.ratingFilter.allowed : DEFAULTS.ratingFilter.allowed);
+    for (const r of RATINGS) $("rf-" + r).checked = allowed.has(r);
     renderOverrides(s.siteOverrides || {});
     updateVisibility();
     updateWarnings();
@@ -41,6 +52,7 @@ function updateVisibility() {
   // Anima forces spaces+lowercase — disable tag-style control when active
   $("tag-style").disabled = isAnima;
   if (isAnima) $("tag-style").value = "spaces";
+  $("rf-options").classList.toggle("hidden", !$("rf-enabled").checked);
 }
 
 function updateWarnings() {
@@ -48,8 +60,112 @@ function updateWarnings() {
   $("warn-character").style.display = v > 1.5 ? "block" : "none";
 }
 
+/* ============================== Tag order ============================== */
+
+const orderSelects = TAG_CATEGORIES.map((_, i) => "order-" + (i + 1)).map($);
+
+function renderTagOrder(order) {
+  const ord = TAGEXT.isValidTagOrder(order) ? order : [...DEFAULTS.tagOrder];
+  orderSelects.forEach((sel, i) => {
+    sel.value = ord[i];
+    sel.dataset.prev = ord[i];
+  });
+}
+
+function readTagOrder() {
+  const ord = orderSelects.map((sel) => sel.value);
+  return TAGEXT.isValidTagOrder(ord) ? ord : [...DEFAULTS.tagOrder];
+}
+
+/* Keep the five selects a valid permutation: changing a select to a category
+   already chosen elsewhere swaps it back into this select's old position. */
+orderSelects.forEach((sel, i) => {
+  sel.addEventListener("focus", () => { sel.dataset.prev = sel.value; });
+  sel.addEventListener("change", () => {
+    const prev = sel.dataset.prev || sel.value;
+    if (prev !== sel.value) {
+      const dup = orderSelects.find((o, j) => j !== i && o.value === sel.value);
+      if (dup) {
+        dup.value = prev;
+        dup.dataset.prev = prev;
+      }
+      sel.dataset.prev = sel.value;
+    }
+  });
+});
+
+/* ============================== Replacement rules ============================== */
+
+let pendingRules = [];
+
+function rulesBytes(rules) {
+  return rules.reduce((n, r) => n + r.find.length + r.replace.length, 0);
+}
+
+function renderRules(rules) {
+  pendingRules = rules
+    .filter((r) => r && typeof r === "object" && typeof r.find === "string" && typeof r.replace === "string")
+    .map((r) => ({ find: r.find.slice(0, LIMITS.rule), replace: r.replace.slice(0, LIMITS.rule) }))
+    .filter((r) => r.find)
+    .slice(0, LIMITS.rules);
+  drawRules();
+}
+
+function drawRules() {
+  const el = $("rule-rows");
+  el.textContent = "";
+  pendingRules.forEach((r, i) => {
+    const row = document.createElement("div");
+    row.className = "override-item";
+    const find = document.createElement("code");
+    find.textContent = r.find;
+    row.appendChild(find);
+    row.appendChild(document.createTextNode(" \u2192 "));
+    const repl = document.createElement("code");
+    repl.textContent = r.replace || "(delete tag)";
+    row.appendChild(repl);
+    const spacer = document.createElement("span");
+    spacer.style.flex = "1";
+    row.appendChild(spacer);
+    const del = document.createElement("button");
+    del.className = "btn-danger";
+    del.textContent = "Remove";
+    del.addEventListener("click", () => { pendingRules.splice(i, 1); drawRules(); });
+    row.appendChild(del);
+    el.appendChild(row);
+  });
+  $("rule-count").textContent = pendingRules.length
+    ? `${pendingRules.length}/${LIMITS.rules} rules \u00B7 ${rulesBytes(pendingRules)}/${LIMITS.rulesBytes} chars`
+    : "";
+}
+
+$("rule-add").addEventListener("click", () => {
+  const find = $("rule-find").value.trim().slice(0, LIMITS.rule);
+  if (!find) { flash("Enter text to find first"); return; }
+  if (pendingRules.length >= LIMITS.rules) { flash(`Limit is ${LIMITS.rules} rules`); return; }
+  if (rulesBytes(pendingRules) + find.length + $("rule-replace").value.length > LIMITS.rulesBytes) { flash("Rules exceed the size limit"); return; }
+  pendingRules.push({ find, replace: $("rule-replace").value.slice(0, LIMITS.rule) });
+  $("rule-find").value = "";
+  $("rule-replace").value = "";
+  drawRules();
+});
+
+/* ============================== Rating filter ============================== */
+
+/* Keep at least one rating checked so exclude mode never blocks everything. */
+for (const r of RATINGS) {
+  $("rf-" + r).addEventListener("click", () => {
+    const boxes = RATINGS.map((x) => $("rf-" + x));
+    if (!boxes.some((b) => b.checked)) {
+      $("rf-" + r).checked = true;
+      flash("At least one rating must stay allowed");
+    }
+  });
+}
+
 function gather() {
   const bl = $("blacklist").value.split("\n").map((s) => s.trim()).filter(Boolean).slice(0, LIMITS.blacklist);
+  const allowed = RATINGS.filter((r) => $("rf-" + r).checked);
   return {
     format: $("format").value,
     prefixPreset: $("prefix-preset").value,
@@ -67,6 +183,13 @@ function gather() {
     autoCopy: $("auto-copy").checked,
     appendSource: $("append-source").checked,
     prefixArtistsWithAt: $("anima-artist").checked,
+    tagOrder: readTagOrder(),
+    replacements: pendingRules,
+    ratingFilter: {
+      enabled: $("rf-enabled").checked,
+      mode: VALID_RATING_MODES.has($("rf-mode").value) ? $("rf-mode").value : DEFAULTS.ratingFilter.mode,
+      allowed: allowed.length ? allowed : [...DEFAULTS.ratingFilter.allowed],
+    },
   };
 }
 
@@ -123,6 +246,17 @@ $("ov-add").addEventListener("click", () => {
 $("format").addEventListener("change", updateVisibility);
 $("prefix-preset").addEventListener("change", updateVisibility);
 $("w-character").addEventListener("input", updateWarnings);
+$("rf-enabled").addEventListener("change", updateVisibility);
+
+/* Populate the tag-order selects (kept in HTML as empty shells for brevity) */
+orderSelects.forEach((sel) => {
+  for (const cat of TAG_CATEGORIES) {
+    const opt = document.createElement("option");
+    opt.value = cat;
+    opt.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
+    sel.appendChild(opt);
+  }
+});
 
 $("save").addEventListener("click", () => {
   const data = gather();
@@ -141,10 +275,21 @@ $("save").addEventListener("click", () => {
 $("reset").addEventListener("click", () => {
   if (!confirm("Reset all settings to defaults?")) return;
   pendingOverrides = {};
-  chrome.storage.sync.set({ ...DEFAULTS, sdWeights: { ...DEFAULTS.sdWeights }, blacklist: [...DEFAULTS.blacklist], siteOverrides: {} }, () => {
-    load();
-    flash("Reset to defaults");
-  });
+  chrome.storage.sync.set(
+    {
+      ...DEFAULTS,
+      sdWeights: { ...DEFAULTS.sdWeights },
+      blacklist: [...DEFAULTS.blacklist],
+      tagOrder: [...DEFAULTS.tagOrder],
+      replacements: [],
+      ratingFilter: { ...DEFAULTS.ratingFilter, allowed: [...DEFAULTS.ratingFilter.allowed] },
+      siteOverrides: {},
+    },
+    () => {
+      load();
+      flash("Reset to defaults");
+    }
+  );
 });
 
 load();

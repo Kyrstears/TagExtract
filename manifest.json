@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TagExtract",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "description": "Copy tags, metadata and copyright from image boards (danbooru, rule34.xxx, e621, gelbooru, safebooru, yande.re, konachan and more) with one click.",
   "permissions": ["storage", "activeTab", "clipboardWrite"],
   "host_permissions": [

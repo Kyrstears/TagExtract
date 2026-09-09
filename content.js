@@ -14,9 +14,9 @@
   if (!SUPPORTED) return;
 
   /* Shared constants — single source of truth in shared.js (loaded first) */
-  const { DEFAULTS, ALLOWED_HOSTS, LIMITS, PREFIX_PRESETS, VALID_FORMATS, VALID_PRESETS, VALID_TAGSTYLES, FORBIDDEN_KEYS, clampWeight } = TAGEXT;
+  const { DEFAULTS, ALLOWED_HOSTS, LIMITS, PREFIX_PRESETS, VALID_FORMATS, VALID_PRESETS, VALID_TAGSTYLES, VALID_RATINGS, VALID_RATING_MODES, TAG_CATEGORIES, FORBIDDEN_KEYS, OVERRIDE_KEYS, clampWeight } = TAGEXT;
 
-  const TAG_TYPES = ["character", "copyright", "artist", "meta", "general"];
+  const TAG_TYPES = TAG_CATEGORIES;
   const DANBOORU_TYPES = { 0: "general", 1: "artist", 3: "copyright", 4: "character", 5: "meta" };
 
   let settings = { ...DEFAULTS, sdWeights: { ...DEFAULTS.sdWeights } };
@@ -35,7 +35,7 @@
       for (const k of Object.keys(DEFAULTS.sdWeights)) {
         if (FORBIDDEN_KEYS.has(k)) continue;
         const v = parseFloat(out.sdWeights[k]);
-        w[k] = isFinite(v) ? Math.min(2.0, Math.max(0.1, Math.round(v * 100) / 100)) : DEFAULTS.sdWeights[k];
+        w[k] = isFinite(v) ? clampWeight(v) : DEFAULTS.sdWeights[k];
       }
       out.sdWeights = w;
     }
@@ -47,6 +47,24 @@
     if (out.format !== undefined && !VALID_FORMATS.has(out.format)) out.format = DEFAULTS.format;
     if (out.prefixPreset !== undefined && !VALID_PRESETS.has(out.prefixPreset)) out.prefixPreset = DEFAULTS.prefixPreset;
     if (out.tagStyle !== undefined && !VALID_TAGSTYLES.has(out.tagStyle)) out.tagStyle = DEFAULTS.tagStyle;
+    if (!TAGEXT.isValidTagOrder(out.tagOrder)) out.tagOrder = [...DEFAULTS.tagOrder];
+    // replacement rules: array of {find, replace} strings, bounded
+    if (!Array.isArray(out.replacements)) out.replacements = [];
+    else out.replacements = out.replacements
+      .filter((r) => r && typeof r === "object" && !Array.isArray(r) && typeof r.find === "string" && typeof r.replace === "string")
+      .slice(0, LIMITS.rules)
+      .map((r) => ({ find: r.find.slice(0, LIMITS.rule), replace: r.replace.slice(0, LIMITS.rule) }))
+      .filter((r) => r.find);
+    // rating filter
+    if (out.ratingFilter !== undefined && (typeof out.ratingFilter !== "object" || out.ratingFilter === null || Array.isArray(out.ratingFilter))) {
+      out.ratingFilter = JSON.parse(JSON.stringify(DEFAULTS.ratingFilter));
+    } else if (out.ratingFilter) {
+      const rf = { enabled: !!out.ratingFilter.enabled, mode: VALID_RATING_MODES.has(out.ratingFilter.mode) ? out.ratingFilter.mode : DEFAULTS.ratingFilter.mode };
+      rf.allowed = Array.isArray(out.ratingFilter.allowed)
+        ? [...new Set(out.ratingFilter.allowed.filter((x) => VALID_RATINGS.has(x)))].slice(0, 4)
+        : [...DEFAULTS.ratingFilter.allowed];
+      out.ratingFilter = rf;
+    }
     // siteOverrides: host allowlist + per-host key validation
     if (out.siteOverrides !== undefined && (typeof out.siteOverrides !== "object" || out.siteOverrides === null || Array.isArray(out.siteOverrides))) {
       out.siteOverrides = {};
@@ -58,6 +76,7 @@
         const entry = {};
         for (const [k, v] of Object.entries(o)) {
           if (FORBIDDEN_KEYS.has(k)) continue;
+          if (!OVERRIDE_KEYS.has(k)) continue; // only format/prefixPreset/tagStyle may be overridden
           if (k === "format" && !VALID_FORMATS.has(v)) continue;
           if (k === "prefixPreset" && !VALID_PRESETS.has(v)) continue;
           if (k === "tagStyle" && !VALID_TAGSTYLES.has(v)) continue;
@@ -105,10 +124,70 @@
   function isListingPage() {
     if (SITES.DANBOORU) return location.pathname === "/posts" || location.pathname.startsWith("/posts?");
     if (SITES.E621) return location.pathname === "/posts";
+    if (SITES.MOEBOORU) return /^\/post\/?$/.test(location.pathname) || (/page=post/.test(location.search) && !/s=view|s=show/.test(location.search));
+    if (SITES.GELBOORU) return /page=post/.test(location.search) && /s=list/.test(location.search);
     return false;
   }
 
   function clean(s) { return (s || "").replace(/\s+/g, " ").trim(); }
+
+  /* ============================== Rating normalization ============================== */
+
+  /* Post pages: read the rating from the sidebar.
+     Returns "safe"|"sensitive"|"questionable"|"explicit" or null when unknown. */
+  function getPostRating() {
+    if (SITES.DANBOORU || SITES.E621) {
+      // Danbooru/e621 store the rating letter in a data attribute on the article
+      const art = document.querySelector("article[data-rating], div[data-rating], [id^=post_][data-rating]");
+      if (art) {
+        const r = TAGEXT.normalizeRating(art.getAttribute("data-rating"), SITES.DANBOORU ? "danbooru" : "e621");
+        if (r) return r;
+      }
+      // e621 sidebar: <li>Rating</li><li>explicit</li> pairs — handled below by text scan
+    }
+    // Stats text scan works on all families ("Rating: Explicit", "Rating: e", etc.)
+    const sources = [];
+    if (SITES.MOEBOORU || SITES.GELBOORU) sources.push(document.querySelector("#stats ul"), document.querySelector("#stats"));
+    if (SITES.DANBOORU || SITES.E621) sources.push(document.querySelector("aside#sidebar"), document.querySelector("#post-information"), document.querySelector(".post-sidebar-info"));
+    for (const src of sources) {
+      if (!src) continue;
+      const m = src.textContent.match(/Rating:\s*([A-Za-z]+)/);
+      if (m) {
+        const r = TAGEXT.normalizeRating(m[1], SITES.DANBOORU ? "danbooru" : "e621");
+        if (r) return r;
+      }
+    }
+    // e621 specific: label/value pairs
+    if (SITES.E621) {
+      const labels = document.querySelectorAll(".post-sidebar-label");
+      for (const lbl of labels) {
+        if (clean(lbl.textContent).toLowerCase() !== "rating") continue;
+        const val = lbl.nextElementSibling;
+        if (val) return TAGEXT.normalizeRating(clean(val.textContent), "e621");
+      }
+    }
+    return null;
+  }
+
+  /* Returns { blocked: bool, known: bool } — known=false means the rating could
+     not be determined, in which case the post is never blocked. */
+  function ratingBlocked(meta, eff) {
+    const rf = eff.ratingFilter;
+    if (!rf || !rf.enabled) return { blocked: false, known: false };
+    let raw = null;
+    // Prefer the live sidebar rating; fall back to extracted meta
+    raw = getPostRating() || (meta && meta.Rating) || null;
+    const rating = TAGEXT.normalizeRating(raw, SITES.DANBOORU ? "danbooru" : "e621");
+    if (!rating) return { blocked: false, known: false };
+    const allowed = rf.allowed && rf.allowed.length ? rf.allowed : DEFAULTS.ratingFilter.allowed;
+    const allowedSet = new Set(allowed);
+    if (rf.mode === "exclude") {
+      // Exclude mode: filter out tags entirely when the rating is not allowed
+      return { blocked: !allowedSet.has(rating), known: true };
+    }
+    // Flag mode: never block; the UI shows a warning badge instead
+    return { blocked: false, known: true, rating };
+  }
 
   /* ============================== Extractors ============================== */
 
@@ -241,6 +320,7 @@
     if (blacklist.length > 200) blacklist = blacklist.slice(0, 200);
     const t = tag.toLowerCase();
     for (const pat of blacklist) {
+      if (typeof pat !== "string") continue;
       const p = (pat || "").trim();
       if (!p) continue;
       if (p.length > 100) continue;
@@ -251,6 +331,21 @@
       } catch (_) { if (t === p.toLowerCase()) return true; }
     }
     return false;
+  }
+
+  /* ============================== Replacement rules ============================== */
+
+  /* Apply user-defined find→replace rules to a tag. Rules run in order; a
+     replacement result is never re-matched against earlier rules. */
+  function applyReplacements(tag, eff) {
+    const rules = eff.replacements;
+    if (!rules || !rules.length) return tag;
+    let t = tag;
+    for (const r of rules) {
+      if (!r || typeof r.find !== "string" || !r.find) continue;
+      t = t.split(r.find).join(r.replace || "");
+    }
+    return t;
   }
 
   /* ============================== Collect ============================== */
@@ -267,19 +362,21 @@
     const blacklist = eff.blacklist || [];
     // Warm cache once per collect
     for (const p of blacklist) { const trimmed = (p || "").trim(); if (trimmed) getRe(trimmed); }
+    const rating = ratingBlocked(result.meta, eff);
     let excluded = 0;
     const filtered = {};
     for (const t of TAG_TYPES) {
       const src = result.tags[t] || [];
       filtered[t] = [];
+      if (rating.blocked) continue; // exclude mode: drop all tags
       for (const tag of src) {
         if (isBlacklisted(tag, blacklist)) excluded++;
         else filtered[t].push(tag);
       }
     }
     const all = TAG_TYPES.flatMap((t) => filtered[t] || []);
-    if (!all.length) return { tags: filtered, meta: result.meta, all: [], counts: { total: 0, excluded }, empty: true };
-    return { tags: filtered, meta: result.meta, all, counts: { total: all.length, excluded, copyright: (filtered.copyright || []).length, artist: (filtered.artist || []).length } };
+    if (!all.length) return { tags: filtered, meta: result.meta, all: [], counts: { total: 0, excluded }, empty: true, rating: rating.rating || null, ratingKnown: rating.known };
+    return { tags: filtered, meta: result.meta, all, counts: { total: all.length, excluded, copyright: (filtered.copyright || []).length, artist: (filtered.artist || []).length }, rating: rating.rating || null, ratingKnown: rating.known };
   }
 
   /* ============================== Tag normalization + SD helpers ============================== */
@@ -288,7 +385,7 @@
     return tag.replace(/\(/g, "\\(").replace(/\)/g, "\\)");
   }
   function normalizeTag(tag, eff, category) {
-    let t = tag;
+    let t = applyReplacements(tag, eff);
     if (eff.stripQualifiers && category === "character") {
       t = t.replace(/\s*\(.*?\)\s*$/, "").trim() || t;
     }
@@ -312,11 +409,16 @@
     const w = eff.sdWeights && eff.sdWeights[cat];
     return clampWeight(w != null ? w : 1.0);
   }
+  /* Ordered categories: user-defined tag order, unknown categories last */
+  function orderedCategories(eff) {
+    const order = Array.isArray(eff.tagOrder) && TAGEXT.isValidTagOrder(eff.tagOrder) ? eff.tagOrder : DEFAULTS.tagOrder;
+    return order;
+  }
   function buildSdParts(data, eff) {
     const parts = [];
     const prefix = resolvePrefix(eff);
     if (prefix) parts.push(prefix);
-    for (const cat of TAG_TYPES) {
+    for (const cat of orderedCategories(eff)) {
       const w = weightForCategory(cat, eff);
       for (const raw of (data.tags[cat] || [])) {
         const norm = normalizeTag(raw, eff, cat);
@@ -346,7 +448,7 @@
     }
 
     const asComma = eff.format === "comma" || eff.format === "sd";
-    const joiner = eff.format === "comma" || eff.format === "sd" ? ", " : " ";
+    const joiner = asComma ? ", " : " ";
 
     if (kind === "all" && eff.format === "sd") {
       const promptParts = buildSdParts(data, eff);
@@ -366,10 +468,10 @@
 
     if (kind === "tags") {
       const flat = [];
-      for (const cat of TAG_TYPES) {
+      for (const cat of orderedCategories(eff)) {
         for (const raw of (data.tags[cat] || [])) {
           let tag = normalizeTag(raw, eff, cat);
-          if (eff.format === "comma" || eff.format === "sd") tag = escapeParens(tag);
+          if (asComma) tag = escapeParens(tag);
           flat.push(tag);
         }
       }
@@ -382,11 +484,10 @@
       const safe = (s) => String(s).replace(/\$/g, "$$$$");
       const flatForTpl = (() => {
         const f = [];
-        for (const cat of TAG_TYPES) for (const raw of (data.tags[cat] || [])) f.push(normalizeTag(raw, eff, cat));
+        for (const cat of orderedCategories(eff)) for (const raw of (data.tags[cat] || [])) f.push(normalizeTag(raw, eff, cat));
         return f;
       })();
-      const joinForTpl = ", ";
-      const tagsStr = flatForTpl.map((t) => eff.format === "comma" ? escapeParens(t) : t).join(joinForTpl);
+      const tagsStr = flatForTpl.join(", ");
       let out = eff.template
         .replace(/\{tags\}/g, safe(tagsStr))
         .replace(/\{copyright\}/g, safe((data.tags.copyright || []).map((x) => normalizeTag(x, eff, "copyright")).join(", ")))
@@ -398,7 +499,7 @@
     }
 
     const flat2 = [];
-    for (const cat of TAG_TYPES) for (const raw of (data.tags[cat] || [])) {
+    for (const cat of orderedCategories(eff)) for (const raw of (data.tags[cat] || [])) {
       let tag = normalizeTag(raw, eff, cat);
       if (asComma) tag = escapeParens(tag);
       flat2.push(tag);
@@ -436,7 +537,7 @@
     });
   }
 
-  /* ============================== Clipboard + feedback ============================== */
+  /* ============================== Clipboard + download + feedback ============================== */
 
   function flash(btn, msg) {
     if (!btn) return;
@@ -469,6 +570,27 @@
     });
   }
 
+  /* Save text as a .txt file via a temporary object URL. Filename is derived
+     from the site and post id and sanitized to [a-z0-9-_]. */
+  function downloadText(text, suggestedName) {
+    const safeName = (suggestedName || "tags").toLowerCase().replace(/[^a-z0-9-_]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "tags";
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = safeName + ".txt";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+  }
+
+  /* Derive a download filename from the current URL: "sitename-postid" */
+  function downloadName() {
+    const m = location.pathname.match(/(\d+)/);
+    const site = host.replace(/^www\./, "").split(".")[0];
+    return m ? `${site}-${m[1]}` : site;
+  }
+
   function doCopy(kind, btn, opts) {
     const silent = opts && opts.silent;
     const skipHistory = opts && opts.skipHistory;
@@ -488,6 +610,45 @@
       if (!silent) flash(btn, "Clipboard blocked");
     });
     return true;
+  }
+
+  /* Copy with per-tag selection: only tags whose checkbox is checked. */
+  function doSelectionCopy(btn) {
+    const data = collect();
+    if (!data || data.empty) { flash(btn, "No tags found"); return; }
+    const selected = selectedTagSet();
+    if (!selected.size) { flash(btn, "No tags selected"); return; }
+    const filtered = {};
+    for (const cat of TAG_TYPES) filtered[cat] = (data.tags[cat] || []).filter((t) => selected.has(rawKey(t)));
+    const partial = { tags: filtered, meta: data.meta, counts: { total: TAG_TYPES.reduce((n, c) => n + filtered[c].length, 0), excluded: 0 } };
+    const text = formatOutput(partial, "tags");
+    writeClipboard(text).then(() => {
+      flash(btn, `Copied ${partial.counts.total} of ${data.counts.total} tags`);
+      recordHistory(text, partial.counts.total);
+    }).catch(() => flash(btn, "Clipboard blocked"));
+  }
+
+  /* Download the current output as .txt (respects per-tag selection when the
+     selection panel exists on this page). */
+  function doDownload() {
+    const data = collect();
+    if (!data || data.empty) { flash(null, ""); return; }
+    let text;
+    let downloaded;
+    const selected = selectedTagSet();
+    if (selected.size) {
+      const filtered = {};
+      for (const cat of TAG_TYPES) filtered[cat] = (data.tags[cat] || []).filter((t) => selected.has(rawKey(t)));
+      const partial = { tags: filtered, meta: data.meta, counts: { total: TAG_TYPES.reduce((n, c) => n + filtered[c].length, 0), excluded: 0 } };
+      text = formatOutput(partial, "tags");
+      downloaded = partial.counts.total;
+    } else {
+      text = formatOutput(data, "tags");
+      downloaded = data.counts.total;
+    }
+    downloadText(text, downloadName());
+    const btn = document.querySelector("#te-buttons .te-btn-download");
+    if (btn) flash(btn, `Saved ${downloaded} tags as .txt`);
   }
 
   /* ============================== Theme ============================== */
@@ -515,6 +676,149 @@
     if (box) box.dataset.teTheme = theme;
     const bar = document.getElementById("te-merge-bar");
     if (bar) bar.dataset.teTheme = theme;
+  }
+
+  /* ============================== Per-tag selection UI ============================== */
+
+  /* Selection state keys match the raw extracted tag text so that checkbox
+     toggles survive re-collection. */
+  function rawKey(tag) { return tag.toLowerCase(); }
+
+  function selectionControls() {
+    const wrap = document.createElement("div");
+    wrap.className = "te-select-controls";
+    const all = document.createElement("button");
+    all.type = "button";
+    all.className = "te-btn te-btn-mini";
+    all.textContent = "Select all";
+    all.addEventListener("click", () => { setAllCheckboxes(true); updateSelectButtons(); });
+    const none = document.createElement("button");
+    none.type = "button";
+    none.className = "te-btn te-btn-mini";
+    none.textContent = "None";
+    none.title = "Deselect all tags";
+    none.addEventListener("click", () => { setAllCheckboxes(false); updateSelectButtons(); });
+    const copySel = document.createElement("button");
+    copySel.type = "button";
+    copySel.className = "te-btn te-btn-mini";
+    copySel.textContent = "Copy selected";
+    copySel.addEventListener("click", () => doSelectionCopy(copySel));
+    const dl = document.createElement("button");
+    dl.type = "button";
+    dl.className = "te-btn te-btn-mini te-btn-download";
+    dl.textContent = ".txt";
+    dl.title = "Save the current tag output as a .txt file";
+    dl.addEventListener("click", doDownload);
+    wrap.append(all, none, copySel, dl);
+    return wrap;
+  }
+
+  /* Build the tag selection list for post pages: one checkbox per tag. */
+  function injectTagSelection() {
+    if (!isPostPage()) return;
+    if (document.getElementById("te-tag-select")) return;
+    const data = collect();
+    if (!data || data.empty) return;
+    const box = document.getElementById("te-buttons");
+    if (!box) return;
+
+    const eff = effectiveSettings();
+    const wrap = document.createElement("div");
+    wrap.id = "te-tag-select";
+    wrap.dataset.teTheme = detectTheme();
+
+    const toggleRow = document.createElement("button");
+    toggleRow.type = "button";
+    toggleRow.className = "te-select-toggle";
+    const glyph = document.createElement("span");
+    glyph.className = "te-glyph";
+    glyph.setAttribute("aria-hidden", "true");
+    glyph.textContent = "\u25B8";
+    const tLabel = document.createElement("span");
+    tLabel.textContent = "Select tags";
+    toggleRow.append(glyph, tLabel);
+    toggleRow.setAttribute("aria-expanded", "false");
+    toggleRow.setAttribute("aria-controls", "te-tag-select-list");
+    const list = document.createElement("div");
+    list.id = "te-tag-select-list";
+    list.className = "te-collapsed";
+    list.setAttribute("role", "group");
+    list.setAttribute("aria-label", "Tag selection");
+    toggleRow.addEventListener("click", () => {
+      const collapsed = list.classList.toggle("te-collapsed");
+      glyph.textContent = collapsed ? "\u25B8" : "\u25BE";
+      toggleRow.setAttribute("aria-expanded", String(!collapsed));
+    });
+
+    for (const cat of orderedCategories(eff)) {
+      const items = data.tags[cat] || [];
+      if (!items.length) continue;
+      const header = document.createElement("div");
+      header.className = "te-cat-header";
+      header.textContent = `${cat.charAt(0).toUpperCase() + cat.slice(1)} (${items.length})`;
+      list.appendChild(header);
+      for (const tag of items) {
+        const line = document.createElement("label");
+        line.className = "te-tag-line";
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.className = "te-tag-check";
+        cb.checked = true;
+        cb.dataset.tag = rawKey(tag);
+        cb.addEventListener("change", updateSelectButtons);
+        const txt = document.createElement("span");
+        txt.textContent = tag;
+        line.append(cb, txt);
+        list.appendChild(line);
+      }
+    }
+
+    const controls = selectionControls();
+    wrap.append(toggleRow, list, controls);
+    box.appendChild(wrap);
+    updateSelectButtons();
+  }
+
+  function setAllCheckboxes(on) {
+    document.querySelectorAll("#te-tag-select-list .te-tag-check").forEach((cb) => { cb.checked = on; });
+    updateSelectButtons();
+  }
+
+  function selectedTagSet() {
+    const set = new Set();
+    document.querySelectorAll("#te-tag-select-list .te-tag-check:checked").forEach((cb) => set.add(cb.dataset.tag));
+    return set;
+  }
+
+  function updateSelectButtons() {
+    const boxes = document.querySelectorAll("#te-tag-select-list .te-tag-check");
+    const checked = document.querySelectorAll("#te-tag-select-list .te-tag-check:checked").length;
+    const copyBtn = document.querySelector(".te-select-controls .te-btn-mini:nth-child(3)");
+    if (copyBtn) copyBtn.textContent = checked ? `Copy selected (${checked})` : "Copy selected";
+    const none = document.querySelector(".te-select-controls .te-btn-mini:nth-child(2)");
+    if (none) none.disabled = checked === 0;
+    const all = document.querySelector(".te-select-controls .te-btn-mini:nth-child(1)");
+    if (all) all.disabled = checked === boxes.length;
+  }
+
+  /* ============================== Rating flag UI ============================== */
+
+  function injectRatingFlag() {
+    if (!isPostPage()) return;
+    const eff = effectiveSettings();
+    const rf = eff.ratingFilter;
+    if (!rf || !rf.enabled || rf.mode !== "flag") return;
+    const box = document.getElementById("te-buttons");
+    if (!box || box.querySelector(".te-rating-flag")) return;
+    const data = collect();
+    if (!data || !data.rating) return;
+    const allowed = new Set(rf.allowed && rf.allowed.length ? rf.allowed : DEFAULTS.ratingFilter.allowed);
+    if (allowed.has(data.rating)) return; // nothing to warn about
+    const flag = document.createElement("div");
+    flag.className = "te-rating-flag";
+    flag.textContent = `\u26A0 Rating: ${data.rating} \u2014 not in allowed list`;
+    flag.title = "This post's rating does not match your rating filter (flag mode)";
+    box.appendChild(flag);
   }
 
   /* ============================== Buttons — textContent (no innerHTML) ============================== */
@@ -585,26 +889,85 @@
     } else {
       document.body.appendChild(box);
     }
+    injectTagSelection();
+    injectRatingFlag();
   }
 
-  /* ============================== Multi-post listing ============================== */
+  /* ============================== Listing page: per-preview tag + rating sources ============================== */
 
-  let listingInjected = false;
+  /* Returns an array of {el, tags[], rating} for the current listing page.
+     Danbooru: article.post-preview[data-tags][data-rating]
+     e621: article.post-preview[data-tags][data-rating]
+     Moebooru: li in ul#post-list-posts, tags from img title/alt ("Tags: ..."), rating from "Rating: ..."
+     Gelbooru 0.2: span.thumb > a > img[title] — tags in img title; rating not on the element (null) */
+  function listingPreviews() {
+    const out = [];
+    if (SITES.DANBOORU || SITES.E621) {
+      document.querySelectorAll("article.post-preview[data-tags], div.post-preview[data-tags]").forEach((el) => {
+        out.push({
+          el,
+          tags: parseDataTags(el.getAttribute("data-tags")),
+          rating: TAGEXT.normalizeRating(el.getAttribute("data-rating"), SITES.DANBOORU ? "danbooru" : "e621"),
+        });
+      });
+    } else if (SITES.MOEBOORU) {
+      document.querySelectorAll("#post-list-posts li").forEach((li) => {
+        const img = li.querySelector("img");
+        if (!img) return;
+        const title = img.getAttribute("title") || img.getAttribute("alt") || "";
+        const tags = parseMoebooruTitle(title);
+        if (!tags.length) return;
+        out.push({ el: li, tags, rating: moebooruTitleRating(title) });
+      });
+    } else if (SITES.GELBOORU) {
+      document.querySelectorAll("span.thumb").forEach((span) => {
+        const img = span.querySelector("img");
+        if (!img) return;
+        const title = img.getAttribute("title") || "";
+        const tags = parseDataTags(title);
+        if (!tags.length) return;
+        out.push({ el: span, tags, rating: gelbooruPreviewRating(span) });
+      });
+    }
+    return out;
+  }
 
   function parseDataTags(str) {
     if (!str) return [];
     return str.trim().split(/\s+/).filter(Boolean).map((t) => t.replace(/_/g, " "));
   }
 
+  /* Moebooru img title: "Rating: Safe Score: 99 Tags: tag1 tag2 User: x" */
+  function parseMoebooruTitle(title) {
+    const m = title.match(/Tags:\s*(.+?)(?:\s+User:|$)/);
+    if (!m) return [];
+    return parseDataTags(m[1]);
+  }
+
+  function moebooruTitleRating(title) {
+    const m = title.match(/Rating:\s*(Safe|Questionable|Explicit)/i);
+    return m ? TAGEXT.normalizeRating(m[1]) : null;
+  }
+
+  /* Gelbooru 0.2: rating is not on span/img — best effort from the inline
+     posts[] JS blob is unreliable to parse here, so return null. The rating
+     filter therefore skips Gelbooru listing previews (still works on post
+     pages via the stats sidebar). */
+  function gelbooruPreviewRating(_span) { return null; }
+
+  /* ============================== Multi-post listing ============================== */
+
+  let listingInjected = false;
+
   function injectListingUI() {
     if (!isListingPage()) return;
     if (document.getElementById("te-merge-bar")) return;
-    const previews = document.querySelectorAll("article.post-preview[data-tags], div.post-preview[data-tags]");
+    const previews = listingPreviews();
     if (!previews.length) return;
-    if (listingInjected && document.querySelector(".te-check")) return;
+    const eff = effectiveSettings();
     listingInjected = true;
 
-    previews.forEach((el) => {
+    previews.forEach(({ el, rating }) => {
       if (el.querySelector(".te-check")) return;
       const cb = document.createElement("input");
       cb.type = "checkbox";
@@ -626,14 +989,17 @@
     const label = document.createElement("span");
     label.className = "te-merge-label";
     label.textContent = "0 posts selected \u00B7 0 tags";
+    const actions = document.createElement("span");
+    actions.className = "te-merge-actions";
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "te-btn te-btn-merge";
     btn.textContent = "Copy merged tags";
     btn.addEventListener("click", doMergeCopy);
-    bar.append(label, btn);
+    actions.appendChild(btn);
+    bar.append(label, actions);
 
-    const postsContainer = document.querySelector("#posts, #post-list, .post-list");
+    const postsContainer = document.querySelector("#posts, #post-list, .post-list, #post-list-posts");
     if (postsContainer && postsContainer.parentElement) {
       // Insert BEFORE flex container to avoid breaking flex flow
       postsContainer.parentElement.insertBefore(bar, postsContainer);
@@ -648,15 +1014,23 @@
   }
 
   function selectedTags() {
-    const cbs = document.querySelectorAll("article.post-preview .te-check:checked, div.post-preview .te-check:checked");
+    const previews = listingPreviews();
     const eff = effectiveSettings();
+    const rf = eff.ratingFilter;
     const seen = new Set();
     const merged = [];
     let excluded = 0;
-    cbs.forEach((cb) => {
-      const article = cb.closest("[data-tags]");
-      const raw = article ? article.getAttribute("data-tags") : "";
-      for (const tag of parseDataTags(raw)) {
+    let selected = 0;
+    let ratingSkipped = 0;
+    for (const { el, tags, rating } of previews) {
+      const cb = el.querySelector(".te-check");
+      if (!cb || !cb.checked) continue;
+      selected++;
+      if (rf && rf.enabled && rf.mode === "exclude" && rating && !isAllowedRating(rating, rf)) {
+        ratingSkipped++;
+        continue;
+      }
+      for (const tag of tags) {
         if (isBlacklisted(tag, eff.blacklist || [])) { excluded++; continue; }
         let t = normalizeTag(tag, eff, "general");
         if (eff.format === "comma" || eff.format === "sd") t = escapeParens(t);
@@ -667,20 +1041,39 @@
         const key = t.toLowerCase();
         if (!seen.has(key)) { seen.add(key); merged.push(t); }
       }
-    });
-    return { tags: merged, count: merged.length, posts: cbs.length, excluded };
+    }
+    return { tags: merged, count: merged.length, posts: selected, excluded, ratingSkipped };
+  }
+
+  function isAllowedRating(rating, rf) {
+    const allowed = rf.allowed && rf.allowed.length ? rf.allowed : DEFAULTS.ratingFilter.allowed;
+    return new Set(allowed).has(rating);
   }
 
   function updateMergeBar() {
     const bar = document.getElementById("te-merge-bar");
     if (!bar) return;
-    const { count, posts } = selectedTags();
+    const { count, posts, ratingSkipped } = selectedTags();
     const label = bar.querySelector(".te-merge-label");
-    if (label) label.textContent = `${posts} post${posts !== 1 ? "s" : ""} selected \u00B7 ${count} tag${count !== 1 ? "s" : ""}`;
+    if (label) {
+      let txt = `${posts} post${posts !== 1 ? "s" : ""} selected \u00B7 ${count} tag${count !== 1 ? "s" : ""}`;
+      if (ratingSkipped > 0) txt += ` \u00B7 ${ratingSkipped} skipped (rating)`;
+      label.textContent = txt;
+    }
+    const warn = bar.querySelector(".te-merge-warn");
+    if (warn) warn.remove();
+    if (count > LIMITS.mergeWarn) {
+      const w = document.createElement("span");
+      w.className = "te-merge-warn";
+      w.textContent = `\u26A0 ${count} tags \u2014 many models degrade past ~${LIMITS.mergeWarn}`;
+      w.title = "Large merged tag sets often produce worse results; consider trimming or using the blacklist";
+      const lbl = bar.querySelector(".te-merge-label");
+      if (lbl && lbl.parentElement) lbl.parentElement.insertBefore(w, lbl.nextSibling);
+    }
   }
 
   function doMergeCopy() {
-    const { tags, count, posts, excluded } = selectedTags();
+    const { tags, count, posts, excluded, ratingSkipped } = selectedTags();
     if (!count) return;
     const eff = effectiveSettings();
     const prefix = eff.format === "sd" ? resolvePrefix(eff) : "";
@@ -697,7 +1090,9 @@
       text = tags.join(joiner);
       if (eff.appendSource) text += "\nSource: " + location.href;
     }
-    const msg = excluded ? `Copied ${count} tags from ${posts} posts (${excluded} excluded)` : `Copied ${count} tags from ${posts} posts`;
+    let msg = `Copied ${count} tags from ${posts} posts`;
+    if (excluded) msg += ` (${excluded} excluded)`;
+    if (ratingSkipped) msg += ` (${ratingSkipped} rating-skipped)`;
     const barBtn = document.querySelector("#te-merge-bar .te-btn-merge");
     writeClipboard(text).then(() => {
       if (barBtn) flash(barBtn, msg);
@@ -795,6 +1190,12 @@
     for (const k of Object.keys(DEFAULTS)) if (sanitized[k] === undefined && changes[k] !== undefined && changes[k].newValue === undefined) settings[k] = DEFAULTS[k];
     Object.assign(settings, sanitized);
     applyTheme();
+    // Rebuild selection UI + rating flag when relevant settings change
+    const sel = document.getElementById("te-tag-select");
+    if (sel) sel.remove();
+    const flag = document.querySelector(".te-rating-flag");
+    if (flag) flag.remove();
+    if (isPostPage()) { injectTagSelection(); injectRatingFlag(); }
   });
 
   window.addEventListener("pagehide", () => { stopObserving(); });
@@ -812,9 +1213,9 @@
         for (const k of Object.keys(DEFAULTS)) if (sanitized[k] === undefined) sanitized[k] = DEFAULTS[k];
         if (!sanitized.sdWeights) sanitized.sdWeights = { ...DEFAULTS.sdWeights };
         Object.assign(settings, sanitized);
-        const isListing = isListingPage() && document.querySelector("[data-tags]");
+        const isListing = isListingPage() && listingPreviews().length > 0;
         if (isListing && msg.type === "copy-tags") {
-          const { tags, count, excluded } = selectedTags();
+          const { tags, count, excluded, ratingSkipped } = selectedTags();
           if (!count) { sendResponse({ ok: false, msg: "Select at least one post (checkboxes on thumbnails)" }); return; }
           const eff = effectiveSettings();
           let text;
@@ -832,7 +1233,8 @@
           }
           writeClipboard(text).then(() => {
             if (msg.via !== "hotkey") recordHistory(text, count);
-            const m = excluded ? `Copied ${count} tags (${excluded} excluded)` : `Copied ${count} tags`;
+            let m = excluded ? `Copied ${count} tags (${excluded} excluded)` : `Copied ${count} tags`;
+            if (ratingSkipped) m += ` (${ratingSkipped} rating-skipped)`;
             sendResponse({ ok: true, msg: m });
           }).catch(() => sendResponse({ ok: false, msg: "Clipboard blocked" }));
           return;

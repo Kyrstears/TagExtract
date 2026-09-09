@@ -25,6 +25,10 @@
     .weights { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
     .weights label { margin-top: 0; font-size: 12px; }
     .weights input { margin-top: 2px; }
+    .order-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+    .order-grid label.hint { display: block; margin: 0 0 2px; }
+    .ratings { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; margin-top: 2px; }
+    .ratings .inline { margin: 0; }
     .warn { color: #ef5350; font-size: 11px; display: none; }
     .hidden { display: none !important; }
     .btn { padding: 8px 18px; border: none; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer; }
@@ -56,7 +60,7 @@
 </head>
 <body>
   <h1>TagExtract Options</h1>
-  <div class="subtitle">SD prompt weights, tag blacklist, and per-site overrides</div>
+  <div class="subtitle">SD prompt weights, tag blacklist, rating filter, and per-site overrides</div>
 
   <h2>Copy format</h2>
   <label for="format">Format</label>
@@ -78,6 +82,7 @@
           <option value="sd15">SD 1.5 (masterpiece, best quality)</option>
           <option value="pony">Pony V6 (score_9, score_8_up, score_7_up)</option>
           <option value="illustrious">Illustrious (masterpiece, best quality, newest, absurdres, highres)</option>
+          <option value="noobai">NoobAI (masterpiece, best quality, newest, absurdres, highres, safe)</option>
           <option value="anima">Anima (masterpiece, best quality, score_7, safe; lowercase, spaces)</option>
           <option value="custom">Custom</option>
         </select>
@@ -124,6 +129,49 @@
   <textarea id="blacklist" class="tall" spellcheck="false" placeholder="commentary&#10;translated&#10;*(cosplay)"></textarea>
   <div class="hint">Case-insensitive. Examples: <code>commentary</code>, <code>bad *</code>, <code>*(cosplay)</code>. Patterns match the tag as shown on that site (Danbooru and e621 use spaces).</div>
 
+  <label for="order-1">Tag category order <span class="hint" style="font-weight:400">(output order; choosing a category that is already used swaps the two positions)</span></label>
+  <div class="order-grid">
+    <div><label class="hint" for="order-1">1st</label><select id="order-1"></select></div>
+    <div><label class="hint" for="order-2">2nd</label><select id="order-2"></select></div>
+    <div><label class="hint" for="order-3">3rd</label><select id="order-3"></select></div>
+    <div><label class="hint" for="order-4">4th</label><select id="order-4"></select></div>
+    <div><label class="hint" for="order-5">5th</label><select id="order-5"></select></div>
+  </div>
+
+  <h2>Replacement rules</h2>
+  <div class="hint">Applied to each tag in order before copying. Find is matched as literal text. Leave Replace empty to delete a tag. Example: <code>1girl</code> → <code>1girl, solo</code>.</div>
+  <div class="row" style="margin-top:8px">
+    <input type="text" id="rule-find" placeholder="Find (e.g. 1girl)" maxlength="200" aria-label="Find" />
+    <input type="text" id="rule-replace" placeholder="Replace with (empty = delete tag)" maxlength="200" aria-label="Replace with" />
+    <button id="rule-add" class="btn btn-primary" style="flex:0 0 auto; padding: 6px 14px;">Add</button>
+  </div>
+  <div id="rule-rows"></div>
+  <div class="hint" id="rule-count"></div>
+
+  <h2>Rating filter</h2>
+  <label class="inline"><input type="checkbox" id="rf-enabled" /> Filter posts by rating</label>
+  <div id="rf-options">
+    <div class="row" style="margin-top:6px">
+      <div>
+        <label for="rf-mode">Mode</label>
+        <select id="rf-mode">
+          <option value="flag">Flag — warn when a post's rating is not allowed</option>
+          <option value="exclude">Exclude — skip disallowed posts entirely</option>
+        </select>
+      </div>
+      <div>
+        <label>Allowed ratings</label>
+        <div class="ratings">
+          <label class="inline"><input type="checkbox" id="rf-safe" /> Safe</label>
+          <label class="inline"><input type="checkbox" id="rf-sensitive" /> Sensitive</label>
+          <label class="inline"><input type="checkbox" id="rf-questionable" /> Questionable</label>
+          <label class="inline"><input type="checkbox" id="rf-explicit" /> Explicit</label>
+        </div>
+      </div>
+    </div>
+    <div class="hint">Ratings are normalized across sites (Danbooru <code>g</code>/<code>s</code> letters map to safe/sensitive; other sites' <code>s</code> maps to safe). Gelbooru listings do not expose ratings, so posts on those listings are never excluded. At least one rating stays checked.</div>
+  </div>
+
   <h2>Behavior</h2>
   <label class="inline"><input type="checkbox" id="auto-copy" /> Auto-copy tags when a post page loads</label>
   <div class="hint" style="margin-top:-4px">Fires once per post. Auto-copies are not added to copy history.</div>
@@ -165,6 +213,7 @@
       <option value="sd15">SD 1.5</option>
       <option value="pony">Pony</option>
       <option value="illustrious">Illustrious</option>
+      <option value="noobai">NoobAI</option>
       <option value="anima">Anima</option>
       <option value="custom">Custom</option>
     </select>
