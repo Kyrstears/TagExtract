@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TagExtract",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Copy tags, metadata and copyright from image boards (danbooru, rule34.xxx, e621, gelbooru, safebooru, yande.re, konachan and more) with one click.",
   "permissions": ["storage", "activeTab", "clipboardWrite"],
   "host_permissions": [
@@ -79,7 +79,7 @@
         "*://lolibooru.moe/*",
         "*://*.lolibooru.moe/*"
       ],
-      "js": ["content.js"],
+      "js": ["shared.js", "content.js"],
       "css": ["style.css"],
       "run_at": "document_idle"
     }

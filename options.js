@@ -1,34 +1,7 @@
-const DEFAULTS = {
-  format: "space",
-  prefixPreset: "sd15",
-  sdPrefix: "masterpiece, best quality",
-  template: "Tags: {tags}\nCopyrights: {copyright}\nArtists: {artist}\nCharacters: {character}\nMetadata:\n{meta}",
-  blacklist: ["commentary", "translated", "request", "commentary request", "visible watermark", "hidden watermark", "md5 mismatch", "bad id"],
-  sdWeights: { character: 1.1, artist: 1.0, copyright: 1.0, general: 1.0 },
-  autoCopy: false,
-  tagStyle: "spaces",
-  stripQualifiers: false,
-  appendSource: false,
-  prefixArtistsWithAt: false,
-  siteOverrides: {},
-};
+/* Shared constants — single source of truth in shared.js (loaded first) */
+const { DEFAULTS, ALLOWED_HOSTS, LIMITS, clampWeight } = TAGEXT;
 
 const $ = (id) => document.getElementById(id);
-
-// Supported hosts only — prevents prototype pollution and spurious overrides
-const ALLOWED_HOSTS = new Set([
-  "danbooru.donmai.us", "rule34.xxx", "rule34.us", "rule34hentai.net",
-  "gelbooru.com", "safebooru.org", "aibooru.online", "xbooru.com",
-  "hypnohub.net", "tbib.org", "e621.net", "e926.org",
-  "yande.re", "konachan.com", "konachan.net", "lolibooru.moe",
-]);
-const LIMITS = { sdPrefix: 500, template: 2000, blacklist: 200 };
-
-function clampWeight(v) {
-  const n = parseFloat(v);
-  if (!isFinite(n)) return 1.0;
-  return Math.min(2.0, Math.max(0.1, Math.round(n * 100) / 100));
-}
 
 function load() {
   chrome.storage.sync.get(DEFAULTS, (s) => {

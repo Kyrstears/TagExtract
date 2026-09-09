@@ -13,44 +13,11 @@
   const SUPPORTED = Object.values(SITES).some(Boolean);
   if (!SUPPORTED) return;
 
+  /* Shared constants — single source of truth in shared.js (loaded first) */
+  const { DEFAULTS, ALLOWED_HOSTS, LIMITS, PREFIX_PRESETS, VALID_FORMATS, VALID_PRESETS, VALID_TAGSTYLES, FORBIDDEN_KEYS, clampWeight } = TAGEXT;
+
   const TAG_TYPES = ["character", "copyright", "artist", "meta", "general"];
   const DANBOORU_TYPES = { 0: "general", 1: "artist", 3: "copyright", 4: "character", 5: "meta" };
-  const FORBIDDEN_KEYS = new Set(["__proto__", "prototype", "constructor"]);
-  const ALLOWED_HOSTS = new Set([
-    "danbooru.donmai.us", "rule34.xxx", "rule34.us", "rule34hentai.net",
-    "gelbooru.com", "safebooru.org", "aibooru.online", "xbooru.com",
-    "hypnohub.net", "tbib.org", "e621.net", "e926.org",
-    "yande.re", "konachan.com", "konachan.net", "lolibooru.moe",
-  ]);
-  const LIMITS = { sdPrefix: 500, template: 2000, blacklist: 200, pattern: 100 };
-
-  /* ============================== defaults ============================== */
-
-  const PREFIX_PRESETS = {
-    none: "",
-    sd15: "masterpiece, best quality",
-    pony: "score_9, score_8_up, score_7_up",
-    illustrious: "masterpiece, best quality, newest, absurdres, highres",
-    anima: "masterpiece, best quality, score_7, safe",
-  };
-  const VALID_FORMATS = new Set(["space", "comma", "sd", "json", "custom"]);
-  const VALID_PRESETS = new Set(["none", "sd15", "pony", "illustrious", "anima", "custom"]);
-  const VALID_TAGSTYLES = new Set(["spaces", "underscores"]);
-
-  const DEFAULTS = {
-    format: "space",
-    prefixPreset: "sd15",
-    sdPrefix: "masterpiece, best quality",
-    template: "Tags: {tags}\nCopyrights: {copyright}\nArtists: {artist}\nCharacters: {character}\nMetadata:\n{meta}",
-    blacklist: ["commentary", "translated", "request", "commentary request", "visible watermark", "hidden watermark", "md5 mismatch", "bad id"],
-    sdWeights: { character: 1.1, artist: 1.0, copyright: 1.0, general: 1.0 },
-    autoCopy: false,
-    tagStyle: "spaces",
-    stripQualifiers: false,
-    appendSource: false,
-    prefixArtistsWithAt: false,
-    siteOverrides: {},
-  };
 
   let settings = { ...DEFAULTS, sdWeights: { ...DEFAULTS.sdWeights } };
 
@@ -317,11 +284,6 @@
 
   /* ============================== Tag normalization + SD helpers ============================== */
 
-  function clampWeight(w) {
-    const n = parseFloat(w);
-    if (!isFinite(n)) return 1.0;
-    return Math.min(2.0, Math.max(0.1, Math.round(n * 100) / 100));
-  }
   function escapeParens(tag) {
     return tag.replace(/\(/g, "\\(").replace(/\)/g, "\\)");
   }
