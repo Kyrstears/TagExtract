@@ -48,7 +48,7 @@ This extension matches 32 URL patterns, covering both http and https on www and 
 
 ### Option A: Download release (recommended)
 
-1. Download [`TagExtract-v1.0.0.zip`](https://github.com/Kyrstears/TagExtract/releases/download/v1.0.0/TagExtract-v1.0.0.zip) from [Releases](https://github.com/Kyrstears/TagExtract/releases/tag/v1.0.0) and unzip it.
+1. Download [`TagExtract-v1.2.0.zip`](https://github.com/Kyrstears/TagExtract/releases/download/v1.2.0/TagExtract-v1.2.0.zip) from [Releases](https://github.com/Kyrstears/TagExtract/releases/tag/v1.2.0) and unzip it.
 2. Go to `chrome://extensions` and enable **Developer mode**.
 3. Click **Load unpacked** and select the unzipped folder.
 4. Open any supported post; the buttons appear below the tag list.
